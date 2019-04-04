@@ -9,8 +9,8 @@ python main.py
 ```
 ### example
 ![a](img/a.png)
-![a](img/b.png)
-![a](img/c.png)
+![b](img/b.png)
+![c](img/c.png)
 
 
 
