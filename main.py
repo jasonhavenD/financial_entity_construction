@@ -10,6 +10,7 @@ from bs4 import BeautifulSoup
 logger = loguru.logger
 folder = './data'
 headers = {
+    'Referer': 'http://xueshu.baidu.com/',
     "Upgrade-Insecure-Requests": "1",
     "Connection": "keep-alive",
     "Cache-Control": "max-age=0",
@@ -43,7 +44,7 @@ def down_html(url, retry=3):
 def main():
     base_url = "https://www.wdzj.com/dangan/search?filter&currentPage="
 
-    for p in range(1, 2):
+    for p in range(1, 21):
         url = base_url+str(p)
         logger.info("page = %s" % (str(p)))
         html = down_html(url)
@@ -70,7 +71,7 @@ def post_process():
     f1 = open('neo4j_format_entity.txt', 'w')
     f2 = open('neo4j_format_relation.txt', 'w')
 
-    for fname in os.listdir(folder):
+    for fname in os.listdir(folder)[:]:
         organ = {}
         item = json.load(open(os.path.join(folder, fname), 'r'))
         title = item['title'].strip()
@@ -82,7 +83,7 @@ def post_process():
                 platform = p
                 break
         if platform == '':
-            logger.info('remove % s as it has no platform.' % (title))
+            logger.info('remove %s' % (title))
             os.remove(os.path.join(folder, fname))
 
         organ['名称'] = item['title'].split('\n')[0]
@@ -95,12 +96,21 @@ def post_process():
         organ['参考利率'] = item['boxs'][0].split('\n')[1].strip()
         organ['待还余额'] = item['boxs'][1].split('：')[1].strip()
         organ['上线时间'] = item['boxs'][3].split('：')[1].strip()
-        organ['网友印想及评分'] = re.sub(r'\s', '', item['boxs'][-1]).strip()
+        tmp = re.sub(r'\s', '', item['boxs'][-1]).strip()
+        organ['网友印想'] = tmp[5:tmp.find('综合评分')+1]
+        organ['综合评分'] = tmp[tmp.find('综合评分')+4:].split('，')[0]
+        organ['点评人数'] = tmp[tmp.find('综合评分')+4:].split('，')[1]
         organ['注册地'] = address[0]
         # title platform address
-        entity_organ = "(%s:机构  %s),\n" % (organ['名称'], str(organ))
+        entity_organ = "(%s:机构  {" % (organ['名称'])
+        for k, v in organ.items():
+            if k == '名称':
+                entity_organ += "%s:'%s'" % (k, v)
+            else:
+                entity_organ += ",%s:'%s'" % (k, v)
+        entity_organ += "}),\n"
         entity_platform = "(%s:平台  %s),\n" % (platform, {'名称': platform})
-        entity_address = "(%s:地址  %s),\n" % (
+        entity_address = "(%s:省份  %s),\n" % (
             organ['注册地'], {'名称': organ['注册地']})
         rel_organ_platform = '(%s)-[:属于]->(%s),\n' % (organ['名称'], platform)
         rel_organ_address = '(%s)-[:注册]->(%s),\n' % (organ['名称'], organ['注册地'])
@@ -116,5 +126,5 @@ def post_process():
 
 # 实体：平台，机构，注册地
 if __name__ == '__main__':
-    main()
+    # main()
     post_process()
